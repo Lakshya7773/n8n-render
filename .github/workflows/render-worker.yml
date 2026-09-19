@@ -7,7 +7,7 @@ on:
         required: true
         type: string
 permissions:
-  contents: read
+  contents: write
 jobs:
   render:
     runs-on: ubuntu-latest
@@ -62,12 +62,22 @@ jobs:
       - name: Ensure Remotion browser
         run: cd n8n-render-cloud && npx remotion browser ensure
       - name: Render
-        run: cd n8n-render-cloud && npx tsx src/render.ts
-      - name: Upload render artifact
-        if: success()
+        id: render
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          cd n8n-render-cloud
+          npx tsx src/render.ts 2>&1 | tee render.log
+      - name: Upload diagnostic artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: youtube-render-${{ github.run_id }}
-          path: n8n-render-cloud/output/
-          if-no-files-found: error
+          name: render-diagnostics-${{ github.run_id }}
+          path: |
+            n8n-render-cloud/render.log
+            n8n-render-cloud/output/
+          if-no-files-found: warn
           retention-days: 1
+      - name: Fail if render failed
+        if: steps.render.outcome != 'success'
+        run: exit 1
