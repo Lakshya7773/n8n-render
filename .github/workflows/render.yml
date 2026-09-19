@@ -30,7 +30,10 @@ jobs:
           p=Path("n8n-render-cloud/src/render.tsx")
           s=p.read_text()
           start=s.index("const jobPath")
-          composition=s[:start] + "\nregisterRoot(Root);\n"
+          composition=s[:start]
+          for line in ["import {createRequire} from 'node:module';","import fs from 'node:fs/promises';","import path from 'node:path';","const require = createRequire(import.meta.url);"]:
+            composition=composition.replace(line,"")
+          composition += "\nregisterRoot(Root);\n"
           Path("n8n-render-cloud/src/composition.tsx").write_text(composition)
           runner="""import {renderMedia, selectComposition} from '@remotion/renderer';
           import {bundle} from '@remotion/bundler';
