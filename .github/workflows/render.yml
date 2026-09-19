@@ -63,7 +63,6 @@ jobs:
         run: cd n8n-render-cloud && npx remotion browser ensure
       - name: Render
         id: render
-        continue-on-error: true
         run: |
           cd n8n-render-cloud
           npm run render > ../render-failure.log 2>&1
@@ -71,17 +70,8 @@ jobs:
           cat ../render-failure.log
           echo "Render exit code: $rc"
           exit $rc
-      - name: Publish failure log
-        if: steps.render.outcome == 'failure'
-        run: |
-          cp render-failure.log "failed-render-${{ inputs.job_id }}.log"
-          git config user.name "github-actions"
-          git config user.email "github-actions@users.noreply.github.com"
-          git add "failed-render-${{ inputs.job_id }}.log"
-          git commit -m "Render failure log ${{ inputs.job_id }}" || true
-          git push
       - name: Publish public render asset
-        if: steps.render.outcome == 'success'
+        if: success()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -89,7 +79,7 @@ jobs:
           tag="render-${{ github.run_id }}"
           gh release create "$tag" "n8n-render-cloud/output/$asset" --title "YouTube Render ${{ github.run_id }}" --notes "Automated render handoff for job ${{ inputs.job_id }}" --target "${{ github.sha }}"
       - name: Upload render artifact
-        if: always()
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: youtube-render-${{ github.run_id }}
