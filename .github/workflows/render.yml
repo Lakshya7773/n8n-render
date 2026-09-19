@@ -18,12 +18,27 @@ jobs:
       - name: Load render job
         env:
           JOB_ID: ${{ inputs.job_id }}
-        run: cp "jobs/${JOB_ID}.json" render-job.json
-      - run: npm install
-      - name: Render
-        run: npm run render
-      - uses: actions/upload-artifact@v4
+        run: tar -xzf n8n-render-cloud-worker.tar.gz && cp "jobs/${JOB_ID}.json" n8n-render-cloud/render-job.json
+      - name: Install worker dependencies
+        run: cd n8n-render-cloud && npm install
+      - name: Render and capture logs
+        continue-on-error: true
+        run: |
+          mkdir -p n8n-render-cloud/output
+          set +e
+          cd n8n-render-cloud
+          node -v
+          pwd
+          ls -la
+          npm run render > output/render.log 2>&1
+          rc=$?
+          echo "exit_code=$rc" > output/exit_code.txt
+          cat output/render.log
+          exit $rc
+      - name: Upload render diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
           name: youtube-render-${{ github.run_id }}
-          path: output/
+          path: n8n-render-cloud/output/
           retention-days: 1
