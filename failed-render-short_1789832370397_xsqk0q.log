@@ -1,0 +1,15 @@
+
+> render
+> tsx src/render.tsx
+
+/home/runner/work/n8n-render/n8n-render/n8n-render-cloud/node_modules/@remotion/bundler/dist/bundle.js:170
+        throw new Error([
+              ^
+
+Error: You passed /home/runner/work/n8n-render/n8n-render/n8n-render-cloud/src/render.tsx as your entry point, but this file does not contain "registerRoot". You should use the file that calls registerRoot() as the entry point. To ignore this error, pass "ignoreRegisterRootWarning" to bundle(). This error cannot be ignored on the CLI.
+    at validateEntryPoint (/home/runner/work/n8n-render/n8n-render/n8n-render-cloud/node_modules/@remotion/bundler/dist/bundle.js:170:15)
+    at async internalBundle (/home/runner/work/n8n-render/n8n-render/n8n-render-cloud/node_modules/@remotion/bundler/dist/bundle.js:184:9)
+    at async Object.bundle (/home/runner/work/n8n-render/n8n-render/n8n-render-cloud/node_modules/@remotion/bundler/dist/bundle.js:360:20)
+    at async <anonymous> (/home/runner/work/n8n-render/n8n-render/n8n-render-cloud/src/render.tsx:57:16)
+
+Node.js v22.23.2
