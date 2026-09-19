@@ -1,0 +1,30 @@
+name: Render YouTube Video
+on:
+  workflow_dispatch:
+    inputs:
+      job_id:
+        description: 'Render job ID; file must exist at jobs/<job_id>.json'
+        required: true
+        type: string
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Load render job
+        env:
+          JOB_ID: ${{ inputs.job_id }}
+        run: cp "jobs/${JOB_ID}.json" render-job.json
+      - run: npm install
+      - name: Render
+        run: npm run render
+      - uses: actions/upload-artifact@v4
+        with:
+          name: youtube-render-${{ github.run_id }}
+          path: output/
+          retention-days: 1
