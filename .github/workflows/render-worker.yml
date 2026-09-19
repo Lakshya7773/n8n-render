@@ -29,6 +29,17 @@ jobs:
         run: cd n8n-render-cloud && npx remotion browser ensure
       - name: Render
         run: cd n8n-render-cloud && npm run render
+      - name: Publish render asset
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JOB_ID: ${{ inputs.job_id }}
+        run: |
+          FILE="${JOB_ID}.mp4"
+          cp "n8n-render-cloud/output/"*.mp4 "$FILE"
+          TAG="render-${{ github.run_id }}"
+          gh release create "$TAG" "$FILE" --title "Render ${{ github.run_id }}" --notes "Automated YouTube render asset for job ${JOB_ID}."
+          rm -f "$FILE"
       - name: Upload render artifact
         if: success()
         uses: actions/upload-artifact@v4
