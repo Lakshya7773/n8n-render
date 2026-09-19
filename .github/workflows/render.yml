@@ -21,18 +21,17 @@ jobs:
       - name: Load render job
         env:
           JOB_ID: ${{ inputs.job_id }}
-        run: tar -xzf n8n-render-cloud-worker.tar.gz && cp "jobs/${JOB_ID}.json" n8n-render-cloud/render-job.json
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
+        run: |
+          tar -xzf n8n-render-cloud-worker.tar.gz
+          cp "jobs/${JOB_ID}.json" n8n-render-cloud/render-job.json
       - name: Install worker dependencies
         run: cd n8n-render-cloud && npm install
       - name: Ensure Remotion browser
-        run: cd n8n-render-cloud && npx remotion browser ensure
+        run: cd n8n-render-cloud && npx remoting browser ensure
       - name: Render
-        id:render
+        id: render
+        continue-on-error: true
         run: |
-          set +e
           cd n8n-render-cloud
           npm run render > ../render-failure.log 2>&1
           rc=$?
@@ -40,21 +39,20 @@ jobs:
           echo "Render exit code: $rc"
           exit $rc
       - name: Publish failure log
-        if: failure()
+        if: steps.render.outcome == 'failure'
         run: |
-          git config user.name "github-action"
-          git config user.email "github-action@users.noreply.github.com"
           cp render-failure.log "failed-render-${{ inputs.job_id }}.log"
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
           git add "failed-render-${{ inputs.job_id }}.log"
-          git commit -m "Render failure log ${{ inputs.job_id }}"
+          git commit -m  "Render failure log ${{ inputs.job_id }}" || true
           git push
       - name: Publish public render asset
-        if: success()
+        if: steps.render.outcome == 'success'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          asset="youtube-${{ github.run_id }}.mp4"
-          cp n8n-render-cloud/output/*.mp4 "n8n-render-cloud/output/$asset"
+          asset=$(basename n8n-render-cloud/output/*.mp4)
           tag="render-${{ github.run_id }}"
           gh release create "$tag" "n8n-render-cloud/output/$asset" --title "YouTube Render ${{ github.run_id }}" --notes "Automated render handoff for job ${{ inputs.job_id }}" --target "${{ github.sha }}"
       - name: Upload render artifact
