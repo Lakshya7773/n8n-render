@@ -52,7 +52,8 @@ jobs:
             const job:RenderJob=JSON.parse(await fs.readFile(jobPath,'utf8'));
             const outDir=path.resolve('output');
             await fs.mkdir(outDir,{recursive:true});
-            const output=path.join(outDir,job.output_name||'render-test.mp4');
+            const outputName=process.env.RENDER_OUTPUT_NAME||job.output_name||'render-test.mp4';
+            const output=path.join(outDir,outputName);
             const serveUrl=await bundle({entryPoint:path.resolve('src/composition.tsx'),webpackOverride:(c:any)=>c});
             const id=job.aspect_ratio==='9:16'?'YTVideoShort':'YTVideo';
             const comp=await selectComposition({serveUrl,id,inputProps:{job}});
@@ -66,34 +67,22 @@ jobs:
       - name: Ensure Remotion browser
         run: cd n8n-render-cloud && npx remotion browser ensure
       - name: Render
-        id: render
-        continue-on-error: true
+        env:
+          RENDER_OUTPUT_NAME: render-${{ github.run_id }}.mp4
         run: |
-          set -o pipefail
           cd n8n-render-cloud
-          npx tsx src/render.ts 2>&1 | tee render.log
-      - name: Upload render artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: render-output-${{ github.run_id }}
-          path: |
-            n8n-render-cloud/render.log
-            n8n-render-cloud/output/
-          if-no-files-found: warn
-          retention-days: 1
-      - name: Publish temporary render log
-        if: steps.render.outcome != 'success'
+          npx tsx src/render.ts
+      - name: Publish public render release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          mkdir -p diagnostics
-          cp n8n-render-cloud/render.log "diagnostics/render-${{ github.run_id }}.log"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "diagnostics/render-${{ github.run_id }}.log"
-          git commit -m "TEMP render diagnostic log ${{ github.run_id }}" || true
-          git push
-      - name: Fail if render failed
-        if: steps.render.outcome != 'success'
-        run: exit 1
+          tag="render-${{ github.run_id }}"
+          asset="n8n-render-cloud/output/render-${{ github.run_id }}.mp4"
+          gh release create "$tag" "$asset" --title "YouTube Render ${{ github.run_id }}" --notes "Automated render handoff for job ${{ inputs.job_id }}" --target "${{ github.sha }}"
+      - name: Upload short-retention render artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: youtube-render-${{ github.run_id }}
+          path: n8n-render-cloud/output/
+          if-no-files-found: error
+          retention-days: 1
