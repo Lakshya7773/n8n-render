@@ -7,7 +7,8 @@ on:
         required: true
         type: string
 permissions:
-  contents: write
+        ops: write
+contents: write
 jobs:
   render:
     runs-on: ubuntu-latest
@@ -27,9 +28,26 @@ jobs:
       - name: Install worker dependencies
         run: cd n8n-render-cloud && npm install
       - name: Ensure Remotion browser
-        run: cd n8n-render-cloud && npx remoting browser ensure
+        run: cd n8n-render-cloud && npx remotion browser ensure
       - name: Render
-        run: cd n8n-render-cloud && npm run render
+        id:render
+        run: |
+          set +e
+          cd n8n-render-cloud
+          npm run render > ../render-failure.log 2>&1
+          rc=$?
+          cat ../render-failure.log
+          echo "Render exit code: $rc"
+          exit $rc
+      - name: Publish failure log
+        if: failure()
+        run: |
+          git config user.name "github-action"
+          git config user.email "github-action@users.noreply.github.com"
+          cp render-failure.log "failed-render-${{ inputs.job_id }}.log"
+          git add "failed-render-${{ inputs.job_id }}.log"
+          git commit -m "Render failure log ${{ inputs.job_id }}"
+          git push
       - name: Publish public render asset
         if: success()
         env:
