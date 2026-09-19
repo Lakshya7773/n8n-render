@@ -23,6 +23,19 @@ jobs:
         run: |
           tar -xzf n8n-render-cloud-worker.tar.gz
           cp "jobs/${JOB_ID}.json" n8n-render-cloud/render-job.json
+      - name: Patch Remotion async entrypoint
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path("n8n-render-cloud/src/render.tsx")
+          s=p.read_text()
+          start=s.index("const jobPath")
+          end=s.index("registerRoot(Root);")
+          block=s[start:end].strip()
+          indented="\n".join("  "+line for line in block.splitlines())
+          s=s[:start]+"async function main(){\n"+indented+"\n}\n\nregisterRoot(Root);\nmain().catch(err=>{console.error(err);process.exit(1);});\n"
+          p.write_text(s)
+          PY
       - name: Install worker dependencies
         run: cd n8n-render-cloud && npm install
       - name: Ensure Remotion browser
@@ -60,4 +73,5 @@ jobs:
         with:
           name: youtube-render-${{ github.run_id }}
           path: n8n-render-cloud/output/
+          if-no-files-found: error
           retention-days: 1
