@@ -7,8 +7,7 @@ on:
         required: true
         type: string
 permissions:
-        ops: write
-contents: write
+  contents: write
 jobs:
   render:
     runs-on: ubuntu-latest
@@ -21,14 +20,14 @@ jobs:
       - name: Load render job
         env:
           JOB_ID: ${{ inputs.job_id }}
-        run: tar -xzf n8n-render-cloud-worker.tar.gz && cp "jobs/${{ inputs.job_id }}.json" n8n-render-cloud/render-job.json
+        run: tar -xzf n8n-render-cloud-worker.tar.gz && cp "jobs/${JOB_ID}.json" n8n-render-cloud/render-job.json
       - uses: actions/setup-node@v4
         with:
           node-version: 22
       - name: Install worker dependencies
         run: cd n8n-render-cloud && npm install
       - name: Ensure Remotion browser
-        run: cd n8n-render-cloud && npx remotin browser ensure
+        run: cd n8n-render-cloud && npx remoting browser ensure
       - name: Render
         run: cd n8n-render-cloud && npm run render
       - name: Publish public render asset
