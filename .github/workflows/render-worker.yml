@@ -30,9 +30,13 @@ jobs:
           import {Composition, registerRoot} from 'remotion';
           export type Scene = { text?: string; title?: string; body?: string; duration?: number; image?: string; };
           export type RenderJob = { type?: 'long_form' | 'short'; aspect_ratio?: '16:9' | '9:16'; duration?: number; title?: string; script?: string; scenes?: Scene[]; visuals?: Scene[]; captions?: string[]; output_name?: string; };
-          const fps=30; const clamp=(n:number,min:number,max:number)=>Math.max(min,Math.min(max,n));
-          function Video({job}:{job:RenderJob}) { return <div style={{width:'100%',height:'100%',background:'#080808',color:'white'}}>{job.title||'Untitled'}</div>; }
-          function Root({job}:{job:RenderJob}) { const width=job.aspect_ratio==='9:16'?1080:1920; const height=job.aspect_ratio==='9:16'?1920:1080; const duration=clamp(Number(job.duration||(job.type==='short'?45:300)),job.type==='short'?20:30,900); return <Composition id="YTVideo" component={Video} durationInFrames={Math.round(duration*fps)} fps={fps} width={width} height={height} defaultProps={{job}}/>; }
+          function Video({job}:{job:RenderJob}) {
+            const scenes=(job?.scenes?.length?job.scenes:job?.visuals?.length?job.visuals:[{text:job?.script||job?.title||''}]);
+            return <div style={{width:'100%',height:'100%',background:'#080808',color:'white',fontFamily:'Arial,sans-serif',display:'flex',alignItems:'center',justifyContent:'center',padding:80,boxSizing:'border-box'}}><div style={{width:'88%',textAlign:'center'}}><div style={{fontSize:58,fontWeight:800,lineHeight:1.08}}>{job?.title||'Untitled'}</div><div style={{marginTop:40,fontSize:38,lineHeight:1.25,opacity:.92}}>{scenes[0]?.title||scenes[0]?.text||job?.script||''}</div></div></div>;
+          }
+          function Root() {
+            return <><Composition id="YTVideo" component={Video} durationInFrames={27000} fps={30} width={1920} height={1080} defaultProps={{job:{}}}/><Composition id="YTVideoShort" component={Video} durationInFrames={1800} fps={30} width={1080} height={1920} defaultProps={{job:{}}}/></>;
+          }
           registerRoot(Root);
           EOF
       - name: Write Node render runner
@@ -44,16 +48,16 @@ jobs:
           import path from 'node:path';
           import type {RenderJob} from './composition';
           const jobPath=process.env.RENDER_JOB||'render-job.json';
-          const fps=30;
           async function main(){
             const job:RenderJob=JSON.parse(await fs.readFile(jobPath,'utf8'));
             const outDir=path.resolve('output');
             await fs.mkdir(outDir,{recursive:true});
             const output=path.join(outDir,job.output_name||'render-test.mp4');
             const serveUrl=await bundle({entryPoint:path.resolve('src/composition.tsx'),webpackOverride:(c:any)=>c});
-            const comp=await selectComposition({serveUrl,id:'YTVideo',inputProps:{job}});
+            const id=job.aspect_ratio==='9:16'?'YTVideoShort':'YTVideo';
+            const comp=await selectComposition({serveUrl,id,inputProps:{job}});
             await renderMedia({codec:'h264',serveUrl,composition:comp,inputProps:{job},outputLocation:output,overwrite:true});
-            await fs.writeFile(path.join(outDir,'result.json'),JSON.stringify({status:'rendered',video_file:output,aspect_ratio:job.aspect_ratio||'16:9',duration:comp.durationInFrames/fps},null,2));
+            await fs.writeFile(path.join(outDir,'result.json'),JSON.stringify({status:'rendered',video_file:output,aspect_ratio:job.aspect_ratio||'16:9',duration:comp.durationInFrames/30},null,2));
           }
           main().catch(err=>{console.error(err);process.exit(1);});
           EOF
@@ -68,8 +72,18 @@ jobs:
           set -o pipefail
           cd n8n-render-cloud
           npx tsx src/render.ts 2>&1 | tee render.log
-      - name: Publish temporary render log
+      - name: Upload render artifact
         if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: render-output-${{ github.run_id }}
+          path: |
+            n8n-render-cloud/render.log
+            n8n-render-cloud/output/
+          if-no-files-found: warn
+          retention-days: 1
+      - name: Publish temporary render log
+        if: steps.render.outcome != 'success'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
