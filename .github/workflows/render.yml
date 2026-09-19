@@ -6,6 +6,8 @@ on:
         description: 'Render job ID; file must exist at jobs/<job_id>.json'
         required: true
         type: string
+permissions:
+  contents: write
 jobs:
   render:
     runs-on: ubuntu-latest
@@ -21,21 +23,17 @@ jobs:
         run: tar -xzf n8n-render-cloud-worker.tar.gz && cp "jobs/${JOB_ID}.json" n8n-render-cloud/render-job.json
       - name: Install worker dependencies
         run: cd n8n-render-cloud && npm install
-      - name: Render and capture logs
-        continue-on-error: true
+      - name: Render
+        run: cd n8n-render-cloud && npm run render
+      - name: Publish public render asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          mkdir -p n8n-render-cloud/output
-          set +e
-          cd n8n-render-cloud
-          node -v
-          pwd
-          ls -la
-          npm run render > output/render.log 2>&1
-          rc=$?
-          echo "exit_code=$rc" > output/exit_code.txt
-          cat output/render.log
-          exit $rc
-      - name: Upload render diagnostics
+          asset="youtube-${{ github.run_id }}.mp4"
+          cp n8n-render-cloud/output/*.mp4 "n8n-render-cloud/output/$asset"
+          tag="render-${{ github.run_id }}"
+          gh release create "$tag" "n8n-render-cloud/output/$asset" --title "YouTube Render ${{ github.run_id }}" --notes "Automated render handoff for job ${{ inputs.job_id }}" --target "${{ github.sha }}"
+      - name: Upload render artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
