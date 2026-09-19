@@ -1,0 +1,77 @@
+name: Render YouTube Video
+on:
+  workflow_dispatch:
+    inputs:
+      job_id:
+        description: 'Render job ID; file must exist at jobs/<job_id>.json'
+        required: true
+        type: string
+permissions:
+  contents: write
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Load render job
+        env:
+          JOB_ID: ${{ inputs.job_id }}
+        run: |
+          tar -xzf n8n-render-cloud-worker.tar.gz
+          cp "jobs/${JOB_ID}.json" n8n-render-cloud/render-job.json
+      - name: Write browser-safe Remotion composition
+        run: |
+          cat > n8n-render-cloud/src/composition.tsx <<'EOF'
+import React from 'react';
+import {Composition, registerRoot} from 'remotion';
+export type Scene = { text?: string; title?: string; body?: string; duration?: number; image?: string; };
+export type RenderJob = { type?: 'long_form' | 'short'; aspect_ratio?: '16:9' | '9:16'; duration?: number; title?: string; script?: string; scenes?: Scene[]; visuals?: Scene[]; captions?: string[]; output_name?: string; };
+const fps=30; const clamp=(n:number,min:number,max:number)=>Math.max(min,Math.min(max,n));
+function Video({job}:{job:RenderJob}) {
+ const scenes=(job.scenes?.length?job.scenes:job.visuals?.length?job.visuals:[{text:job.script||job.title||''}]);
+ return <div style={{width:'100%',height:'100%',background:'#080808',color:'white',fontFamily:'Arial,sans-serif',display:'flex',alignItems:'center',justifyContent:'center',padding:80,boxSizing:'border-box'}}><div style={{width:'88%',textAlign:'center'}}><div style={{fontSize:job.aspect_ratio==='9:16'?64:58,fontWeight:800,lineHeight:1.08}}>{job.title||'Untitled'}</div><div style={{marginTop:40,fontSize:job.aspect_ratio==='9:16'?48:38,lineHeight:1.25,opacity:.92}}>{scenes[0]?.title||scenes[0]?.text||job.script||''}</div></div></div>;
+}
+function Root({job}:{job:RenderJob}) { const width=job.aspect_ratio==='9:16'?1080:1920; const height=job.aspect_ratio==='9:16'?1920:1080; const duration=clamp(Number(job.duration||(job.type==='short'?45:300)),job.type==='short'?20:30,900); return <Composition id="YTVideo" component={Video} durationInFrames={Math.round(duration*fps)} fps={fps} width={width} height={height} defaultProps={{job}}/>; }
+registerRoot(Root);
+EOF
+      - name: Write Node render runner
+        run: |
+          cat > n8n-render-cloud/src/render.ts <<'EOF'
+import {renderMedia,selectComposition} from '@remotion/renderer';
+import {bundle} from '@remotion/bundler';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import type {RenderJob} from './composition';
+const jobPath=process.env.RENDER_JOB||'render-job.json'; const fps=30;
+async function main(){ const job:RenderJob=JSON.parse(await fs.readFile(jobPath,'utf8')); const outDir=path.resolve('output'); await fs.mkdir(outDir,{recursive:true}); const output=path.join(outDir,job.output_name||`render-${Date.now()}.mp4`); const serveUrl=await bundle({entryPoint:path.resolve('src/composition.tsx'),webpackOverride:(c:any)=>c}); const comp=await selectComposition({serveUrl,id:'YTVideo',inputProps:{job}}); await renderMedia({codec:'h264',serveUrl,composition:comp,inputProps:{job},outputLocation:output,overwrite:true}); await fs.writeFile(path.join(outDir,'result.json'),JSON.stringify({status:'rendered',video_file:output,aspect_ratio:job.aspect_ratio||'16:9',duration:comp.durationInFrames/fps},null,2)); console.log(JSON.stringify({status:'rendered',video_file:output,duration:comp.durationInFrames/fps})); }
+main().catch(err=>{console.error(err);process.exit(1);});
+EOF
+      - name: Set render script
+        run: |
+          node -e "const fs=require('fs');const p='n8n-render-cloud/package.json';const x=JSON.parse(fs.readFileSync(p));x.scripts={...(x.scripts||{}),render:'tsx src/render.ts'};fs.writeFileSync(p,JSON.stringify(x,null,2));"
+      - name: Install worker dependencies
+        run: cd n8n-render-cloud && npm install
+      - name: Ensure Remotion browser
+        run: cd n8n-render-cloud && npx remotion browser ensure
+      - name: Render
+        run: cd n8n-render-cloud && npm run render
+      - name: Publish public render asset
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          asset=$(basename n8n-render-cloud/output/*.mp4)
+          tag="render-${{ github.run_id }}"
+          gh release create "${tag}" "n8n-render-cloud/output/${asset}" --title "YouTube Render ${{ github.run_id }}" --notes "Automated render handoff for job ${{ inputs.job_id }}" --target "${{ github.sha }}"
+      - name: Upload render artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: youtube-render-${{ github.run_id }}
+          path: n8n-render-cloud/output/
+          if-no-files-found: error
+          retention-days: 1
