@@ -107,7 +107,13 @@ def render(job):
     run(["ffmpeg","-y","-i",str(silent),"-i",str(audio),"-vf",style,"-map","0:v:0","-map","1:a:0","-c:v","libx264","-preset","veryfast","-crf","22","-c:a","aac","-b:a","128k","-shortest","-movflags","+faststart",str(out)])
     thumb=work/"thumbnail.jpg"
     run(["ffmpeg","-y","-ss","2","-i",str(out),"-frames:v","1","-q:v","2",str(thumb)])
-    return {"video":str(out),"thumbnail":str(thumb),"assets":assets,"duration":duration}
+    probe=run(["ffprobe","-v","error","-show_entries","format=duration","-show_entries","stream=codec_type","-of","json",str(out)])
+    meta=json.loads(probe.stdout)
+    streams=[x.get("codec_type") for x in meta.get("streams",[])]
+    actual=float(meta.get("format",{}).get("duration") or 0)
+    if actual < max(5,duration*0.9) or "video" not in streams or "audio" not in streams:
+        raise RuntimeError(f"render verification failed: duration={actual}, streams={streams}")
+    return {"video":str(out),"thumbnail":str(thumb),"assets":assets,"duration":actual,"verified":True}
 
 if __name__=="__main__":
     job=json.loads(sys.stdin.read()); print(json.dumps(render(job)))
