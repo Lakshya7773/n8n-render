@@ -1,0 +1,12 @@
+services:
+  yt-renderer:
+    build: .
+    restart: unless-stopped
+    environment:
+      PORT: 5002
+      DATA_DIR: /data
+      TTS_VOICE: en-US-GuyNeural
+    volumes:
+      - ./data:/data
+    ports:
+      - "5002:5002"
