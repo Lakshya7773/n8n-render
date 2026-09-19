@@ -1,5 +1,7 @@
 name: Render YouTube Video
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       job_id:
@@ -19,7 +21,7 @@ jobs:
           node-version: 22
       - name: Load render job
         env:
-          JOB_ID: ${{ inputs.job_id }}
+          JOB_ID: ${{ inputs.job_id || 'short_1789828712968_qrd464' }}
         run: |
           tar -xzf n8n-render-cloud-worker.tar.gz
           cp "jobs/${JOB_ID}.json" n8n-render-cloud/render-job.json
