@@ -63,13 +63,24 @@ jobs:
         run: cd n8n-render-cloud && npx remotion browser ensure
       - name: Render
         id: render
+        continue-on-error: true
         run: |
+          set -o pipefail
           cd n8n-render-cloud
-          npm run render > ../render-failure.log 2>&1
-          rc=$?
-          cat ../render-failure.log
-          echo "Render exit code: $rc"
-          exit $rc
+          npm run render 2>&1 | tee render.log
+      - name: Upload render diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: render-diagnostics-${{ github.run_id }}
+          path: |
+            n8n-render-cloud/render.log
+            n8n-render-cloud/output/result.json
+          if-no-files-found: warn
+          retention-days: 1
+      - name: Fail if render failed
+        if: steps.render.outcome == 'failure'
+        run: exit 1
       - name: Publish public render asset
         if: success()
         env:
