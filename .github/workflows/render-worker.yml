@@ -68,16 +68,18 @@ jobs:
           set -o pipefail
           cd n8n-render-cloud
           npx tsx src/render.ts 2>&1 | tee render.log
-      - name: Upload diagnostic artifact
+      - name: Publish temporary render log
         if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: render-diagnostics-${{ github.run_id }}
-          path: |
-            n8n-render-cloud/render.log
-            n8n-render-cloud/output/
-          if-no-files-found: warn
-          retention-days: 1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p diagnostics
+          cp n8n-render-cloud/render.log "diagnostics/render-${{ github.run_id }}.log"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "diagnostics/render-${{ github.run_id }}.log"
+          git commit -m "TEMP render diagnostic log ${{ github.run_id }}" || true
+          git push
       - name: Fail if render failed
         if: steps.render.outcome != 'success'
         run: exit 1
