@@ -1,0 +1,22 @@
+
+> render
+> tsx src/render.tsx
+
+Error: Module build failed: UnhandledSchemeError: Reading from "node:module" is not handled by plugins (Unhandled scheme).
+Webpack supports "data:" and "file:" URIs by default.
+You may need an additional plugin to handle "node:" URIs.
+    at /home/runner/work/n8n-render/n8n-render/n8n-render-cloud/node_modules/webpack/lib/NormalModule.js:1062:13
+    at Hook.eval [as callAsync] (eval at create (/home/runner/work/n8n-render/n8n-render/n8n-render-cloud/node_modules/tapable/lib/HookCodeFactory.js:31:10), <anonymous>:6:1)
+    at Hook.CALL_ASYNC_DELEGATE [as _callAsync] (/home/runner/work/n8n-render/n8n-render/n8n-render-cloud/node_modules/tapable/lib/Hook.js:21:14)
+    at /home/runner/work/n8n-render/n8n-render/n8n-render-cloud/node_modules/webpack/lib/NormalModule.js:1056:10
+    at new Promise (<anonymous>)
+    at readResource (/home/runner/work/n8n-render/n8n-render/n8n-render-cloud/node_modules/webpack/lib/NormalModule.js:1053:14)
+    at Object.processResource (/home/runner/work/n8n-render/n8n-render/n8n-render-cloud/node_modules/webpack/lib/NormalModule.js:1075:28)
+    at processResource (/home/runner/work/n8n-render/n8n-render/n8n-render-cloud/node_modules/loader-runner/lib/LoaderRunner.js:295:10)
+    at iteratePitchingLoaders (/home/runner/work/n8n-render/n8n-render/n8n-render-cloud/node_modules/loader-runner/lib/LoaderRunner.js:358:9)
+    at runLoaders (/home/runner/work/n8n-render/n8n-render/n8n-render-cloud/node_modules/loader-runner/lib/LoaderRunner.js:525:2)
+undefined
+    at runWebpack (/home/runner/work/n8n-render/n8n-render/n8n-render-cloud/node_modules/@remotion/bundler/dist/bundle.js:236:23)
+    at async internalBundle (/home/runner/work/n8n-render/n8n-render/n8n-render-cloud/node_modules/@remotion/bundler/dist/bundle.js:240:13)
+    at async bundle (/home/runner/work/n8n-render/n8n-render/n8n-render-cloud/node_modules/@remotion/bundler/dist/bundle.js:360:20)
+    at async main (/home/runner/work/n8n-render/n8n-render/n8n-render-cloud/src/render.tsx:13:18)
